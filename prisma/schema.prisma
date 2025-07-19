@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  googleId  String   @unique @map("google_id")
+  email     String   @unique
+  firstName String
+  lastName  String
+  avatarUrl String?  @map("avatar_url")
+  bio       String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  reviews    Review[]
+  dishes     Dish[]     @relation("DishCreator")
+  favorites  UserFavorite[]
+  followers  UserFollow[] @relation("UserFollowing")
+  following  UserFollow[] @relation("UserFollower")
+
+  @@map("users")
+}
+
+model Restaurant {
+  id          Int     @id @default(autoincrement())
+  name        String
+  address     String
+  city        String?
+  state       String?
+  latitude    Decimal? @db.Decimal(10, 8)
+  longitude   Decimal? @db.Decimal(11, 8)
+  cuisineType String? @map("cuisine_type")
+  priceRange  Int?    @map("price_range") // 1-4 for $, $$, $$$, $$$$
+  googlePlaceId String? @unique @map("google_place_id")
+  phone       String?
+  website     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  dishes Dish[]
+
+  @@map("restaurants")
+}
+
+model Dish {
+  id           Int      @id @default(autoincrement())
+  name         String
+  description  String?
+  restaurantId Int      @map("restaurant_id")
+  category     String?  // appetizer, main, dessert, drink
+  dietaryTags  String[] @map("dietary_tags") // vegetarian, vegan, etc.
+  price        Decimal? @db.Decimal(8, 2)
+  isSeasonal   Boolean  @default(false) @map("is_seasonal")
+  createdById  Int?     @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdBy  User?      @relation("DishCreator", fields: [createdById], references: [id])
+  reviews    Review[]
+  favorites  UserFavorite[]
+
+  @@map("dishes")
+}
+
+model Review {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  dishId     Int      @map("dish_id")
+  rating     Int      // 1-5
+  reviewText String?  @map("review_text")
+  photoUrls  String[] @map("photo_urls")
+  visitDate  DateTime @default(now()) @map("visit_date")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dish Dish @relation(fields: [dishId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dishId]) // One review per user per dish
+  @@map("reviews")
+}
+
+model UserFavorite {
+  id     Int @id @default(autoincrement())
+  userId Int @map("user_id")
+  dishId Int @map("dish_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dish Dish @relation(fields: [dishId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dishId])
+  @@map("user_favorites")
+}
+
+model UserFollow {
+  id          Int @id @default(autoincrement())
+  followerId  Int @map("follower_id")
+  followingId Int @map("following_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  follower  User @relation("UserFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("user_follows")
+}
