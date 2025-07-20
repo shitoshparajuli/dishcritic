@@ -7,14 +7,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum PriceRange {
+  ONE   // $
+  TWO   // $$
+  THREE // $$$
+  FOUR  // $$$$
+}
+
 model User {
   id        Int      @id @default(autoincrement())
   googleId  String   @unique @map("google_id")
-  email     String   @unique
-  firstName String
-  lastName  String
-  avatarUrl String?  @map("avatar_url")
-  bio       String?
+  email     String   @unique @db.VarChar(255)
+  firstName String   @db.VarChar(100)
+  lastName  String   @db.VarChar(100)
+  avatarUrl String?  @map("avatar_url") @db.VarChar(500)
+  bio       String?  @db.VarChar(500)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -23,39 +30,40 @@ model User {
   favorites  UserFavorite[]
   followers  UserFollow[] @relation("UserFollowing")
   following  UserFollow[] @relation("UserFollower")
+  accounts   Account[]
 
   @@map("users")
 }
 
 model Restaurant {
   id          Int     @id @default(autoincrement())
-  name        String
-  address     String
-  city        String?
-  state       String?
+  name        String  @db.VarChar(200)
+  address     String  @db.VarChar(300)
+  city        String? @db.VarChar(100)
+  state       String? @db.VarChar(50)
   latitude    Decimal? @db.Decimal(10, 8)
   longitude   Decimal? @db.Decimal(11, 8)
-  cuisineType String? @map("cuisine_type")
-  priceRange  Int?    @map("price_range") // 1-4 for $, $$, $$$, $$$$
-  googlePlaceId String? @unique @map("google_place_id")
-  phone       String?
-  website     String?
+  cuisineType String? @map("cuisine_type") @db.VarChar(100)
+  priceRange  PriceRange? @map("price_range")
+  googlePlaceId String? @unique @map("google_place_id") @db.VarChar(100)
+  phone       String? @db.VarChar(20)
+  website     String? @db.VarChar(300)
   createdAt   DateTime @default(now()) @map("created_at")
 
   dishes Dish[]
 
+  @@index([city, state])
+  @@index([latitude, longitude])
+  @@index([cuisineType])
   @@map("restaurants")
 }
 
 model Dish {
   id           Int      @id @default(autoincrement())
-  name         String
-  description  String?
+  name         String   @db.VarChar(200)
+  description  String?  @db.VarChar(1000)
   restaurantId Int      @map("restaurant_id")
-  category     String?  // appetizer, main, dessert, drink
-  dietaryTags  String[] @map("dietary_tags") // vegetarian, vegan, etc.
   price        Decimal? @db.Decimal(8, 2)
-  isSeasonal   Boolean  @default(false) @map("is_seasonal")
   createdById  Int?     @map("created_by")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -65,6 +73,10 @@ model Dish {
   reviews    Review[]
   favorites  UserFavorite[]
 
+  @@index([restaurantId])
+  @@index([category])
+  @@index([createdAt])
+  @@index([name])
   @@map("dishes")
 }
 
@@ -72,8 +84,8 @@ model Review {
   id         Int      @id @default(autoincrement())
   userId     Int      @map("user_id")
   dishId     Int      @map("dish_id")
-  rating     Int      // 1-5
-  reviewText String?  @map("review_text")
+  rating     Int      @db.SmallInt // 1-5
+  reviewText String?  @map("review_text") @db.VarChar(2000)
   photoUrls  String[] @map("photo_urls")
   visitDate  DateTime @default(now()) @map("visit_date")
   createdAt  DateTime @default(now()) @map("created_at")
@@ -83,6 +95,10 @@ model Review {
   dish Dish @relation(fields: [dishId], references: [id], onDelete: Cascade)
 
   @@unique([userId, dishId]) // One review per user per dish
+  @@index([dishId])
+  @@index([userId])
+  @@index([rating])
+  @@index([createdAt])
   @@map("reviews")
 }
 
@@ -110,4 +126,33 @@ model UserFollow {
 
   @@unique([followerId, followingId])
   @@map("user_follows")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            Int     @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verificationtokens")
 }
